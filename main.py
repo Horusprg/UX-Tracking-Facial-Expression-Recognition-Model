@@ -1,4 +1,3 @@
-
 '''
 All the code was developed by Flávio Moura, a scientific research from the Federal University of Pará and member of the 
 Operational Research Laboratory. This repo aims to train multiple models for the task of facial expression recognition.
@@ -15,48 +14,19 @@ For more informations about:
 Please, contact Flávio Moura in the email: flavio.moura@itec.ufpa.br
 '''
 
-import tensorflow as tf
-from keras.regularizers import l2
-from keras.callbacks import EarlyStopping, ModelCheckpoint, LearningRateScheduler
+import torch
 
-from utils import load_and_tune, model_select
+from utils import load_data, model_select, train_model
 
-# Data settings
+# Configurações principais
 data_dir = 'AffectNet'
 img_height, img_width = 96, 96
-batch_size = 256
-
-train_ds, val_ds = load_and_tune(data_dir=data_dir, 
-                                 img_height=img_height,
-                                 img_width=img_width,
-                                 batch_size=batch_size)
-
-# Model selection (EfficientNet, ...)
-
-model = model_select(model='EfficientNet1',
-                     img_height=img_height,
-                     img_width=img_width)
-
-# Train settings
+batch_size = 512
 epochs = 100
 
-# Exponential learning rate
-def scheduler(epoch, lr):
-    if epoch < 10:
-        return lr
-    else:
-        return lr * tf.math.exp(-1/epochs)
+train_loader, val_loader = load_data(data_dir, img_height, img_width, batch_size)
+model = model_select(img_height, img_width)
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+model = model.to(device)
 
-# Callbacks
-early_stopping = EarlyStopping(monitor='val_mse', patience=20, verbose=0, mode='min')
-model_checkpoint = ModelCheckpoint('best_lstm.h5', monitor='val_mse', mode='min', save_best_only=True, verbose=0)
-reduce_lr = LearningRateScheduler(schedule=scheduler, verbose=1)
-
-
-model.compile(
-    optimizer='adam',
-    loss='sparse_categorical_crossentropy',
-    metrics=['accuracy']
-)
-
-model.fit(train_ds, epochs=epochs, validation_data=val_ds)
+train_model(model, train_loader, val_loader, device, epochs)
