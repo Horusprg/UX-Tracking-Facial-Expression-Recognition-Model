@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.optim as optim
 from torchvision import datasets, models, transforms
 from torch.utils.data import DataLoader, random_split
-from torch.optim.lr_scheduler import ExponentialLR
+from torch.optim.lr_scheduler import ExponentialLR, ReduceLROnPlateau
 from sklearn.metrics import precision_score, recall_score
 
 # Configurações de transformação de dados
@@ -29,7 +29,7 @@ def load_data(data_dir, img_height, img_width, batch_size):
     train_transform, val_transform = get_transforms(img_height, img_width)
 
     dataset = datasets.ImageFolder(data_dir)
-    train_size = int(0.8 * len(dataset))
+    train_size = int(0.9 * len(dataset))
     val_size = len(dataset) - train_size
     train_dataset, val_dataset = random_split(dataset, [train_size, val_size])
     train_dataset.dataset.transform = train_transform
@@ -40,20 +40,60 @@ def load_data(data_dir, img_height, img_width, batch_size):
     return train_loader, val_loader
 
 # Definição do modelo
-def model_select(img_height, img_width):
-    model = models.efficientnet_b0(weights=models.EfficientNet_B0_Weights.DEFAULT)
-    num_ftrs = model.classifier[1].in_features
-    model.classifier[1] = nn.Linear(num_ftrs, 8)  # 8 classes
+def model_select(name, img_height, img_width):
+    model_list =['EfficientNet', 'Resnet50', 'MobileNet']
+
+    if name in model_list:
+        if name == 'EfficientNet':
+            model = models.efficientnet_b1(weights=models.EfficientNet_B1_Weights.DEFAULT)
+            # Add classifier
+            num_ftrs = model.classifier[1].in_features
+            model.classifier = nn.Sequential(
+                nn.Dropout(0.1),
+                nn.Linear(num_ftrs, 512),
+                nn.ReLU(),
+                nn.BatchNorm1d(512),
+                nn.Dropout(0.1),
+                nn.Linear(512, 8)
+            )
+        
+        elif name == 'Resnet50':
+            model = models.resnet50(weights=models.ResNet50_Weights.DEFAULT)
+            # Add classifier
+            num_ftrs = model.fc.in_features
+            model.fc = nn.Sequential(
+                nn.Dropout(0.1),
+                nn.Linear(num_ftrs, 512),
+                nn.ReLU(),
+                nn.BatchNorm1d(512),
+                nn.Dropout(0.1),
+                nn.Linear(512, 8)
+            )
+        elif name == 'MobileNet':
+            model = models.MobileNetV2(weights=models.MobileNet_V2_Weights.DEFAULT)
+            # Add classifier
+            num_ftrs = model.classifier[1].in_features
+            model.classifier = nn.Sequential(
+                nn.Dropout(0.1),
+                nn.Linear(num_ftrs, 512),
+                nn.ReLU(),
+                nn.BatchNorm1d(512),
+                nn.Dropout(0.1),
+                nn.Linear(512, 8)
+            )
+    else:
+        raise Exception("Model not implemented!")
     return model
 
 # Função de treinamento e validação
-def train_model(model, train_loader, val_loader, device, epochs, metrics_path='training_metrics.txt', patience=20):
+def train_model(model, train_loader, val_loader, device, epochs, metrics_path='training_metrics.txt', patience=20, weight_decay=1e-5):
     criterion = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(model.parameters(), lr=0.01)
-    scheduler = ExponentialLR(optimizer, gamma=0.1)
+    optimizer = optim.Adam(model.parameters(), lr=0.001, weight_decay=weight_decay)
+    #scheduler = ExponentialLR(optimizer, gamma=0.1)
+    scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=5, verbose=True)
 
     # Inicializa as variáveis para Early Stopping
-    best_val_loss = float('inf')
+    best_precision = float('inf')
     epochs_no_improve = 0
     early_stop = False
 
@@ -101,11 +141,11 @@ def train_model(model, train_loader, val_loader, device, epochs, metrics_path='t
         metrics['precision'].append(precision)
         metrics['recall'].append(recall)
 
-        scheduler.step()
+        scheduler.step(val_loss)
 
         # Verifica o Early Stopping
-        if val_loss < best_val_loss:
-            best_val_loss = val_loss
+        if precision < best_precision:
+            best_precision = precision
             epochs_no_improve = 0
         else:
             epochs_no_improve += 1

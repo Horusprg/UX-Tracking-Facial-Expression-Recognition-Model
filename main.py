@@ -21,12 +21,13 @@ from utils import load_data, model_select, train_model
 # Configurações principais
 data_dir = 'AffectNet'
 img_height, img_width = 96, 96
-batch_size = 512
+batch_size = 256
 epochs = 100
 
+
 train_loader, val_loader = load_data(data_dir, img_height, img_width, batch_size)
-model = model_select(img_height, img_width)
+model = model_select('EfficientNet', img_height, img_width)
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 model = model.to(device)
 
-train_model(model, train_loader, val_loader, device, epochs)
+train_model(model, train_loader, val_loader, device, epochs, patience=10)
