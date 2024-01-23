@@ -43,7 +43,7 @@ def get_transforms(img_height, img_width):
 
 # Carregamento dos dados
 def load_data(data_dir, img_height, img_width, batch_size):
-    train_transform, val_transform = get_transforms(img_height, img_width)
+    train_transform, _ = get_transforms(img_height, img_width)
 
     dataset = datasets.ImageFolder(data_dir)
     dataset.transform = train_transform  # Aplica transformações de treinamento

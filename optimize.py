@@ -1,14 +1,16 @@
 import torch
 import torch.nn as nn
 from torch.optim import Adam
+from torchvision import datasets
 from skopt.utils import use_named_args
+from torch.utils.data import DataLoader, random_split
 from skopt.space import Real, Integer
 from skopt import gp_minimize
 import numpy as np
 import csv
 from sklearn.metrics import f1_score
 
-from utils import load_data, model_select
+from utils import model_select, get_transforms
 
 # Hyperparameters Space
 space = [
@@ -16,13 +18,27 @@ space = [
     Integer(128, 512, name="batch_size"),
 ]
 
+def load_split_data(data_dir, img_height, img_width, batch_size):
+    train_transform, val_transform = get_transforms(img_height, img_width)
+
+    dataset = datasets.ImageFolder(data_dir)
+    train_size = int(0.9 * len(dataset))
+    val_size = len(dataset) - train_size
+    train_dataset, val_dataset = random_split(dataset, [train_size, val_size])
+    train_dataset.dataset.transform = train_transform
+    val_dataset.dataset.transform = val_transform
+
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    val_loader = DataLoader(val_dataset, batch_size=batch_size)
+    return train_loader, val_loader
 
 @use_named_args(space)
 def objective(learning_rate, batch_size):
     # Configurações principais
     batch_size = int(batch_size)
 
-    train_loader, val_loader = load_data(DATA_DIR, IMG_HEIGHT, IMG_WIDTH, batch_size)
+    train_loader, val_loader = load_split_data(DATA_DIR, IMG_HEIGHT, IMG_WIDTH, batch_size)
+    
     criterion = nn.CrossEntropyLoss()
     model = model_select(MODEL_NAME) 
     model = model.to(DEVICE)
