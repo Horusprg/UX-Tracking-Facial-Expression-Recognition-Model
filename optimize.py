@@ -10,7 +10,7 @@ import numpy as np
 import csv
 from sklearn.metrics import f1_score
 
-from utils import model_select, get_transforms
+from utils import model_select, get_transforms, set_seed
 
 # Hyperparameters Space
 space = [
@@ -98,10 +98,11 @@ def train_and_evaluate(
 
 if __name__ == '__main__':
     np.int = int
+    set_seed(42)
     DATA_DIR = 'AffectNet'
     IMG_HEIGHT, IMG_WIDTH = 96, 96
     EPOCHS = 5 # Epochs per optimization candidate
-    MODEL_NAME = 'EfficientNet' # EfficientNet, Resnet50 or MobileNet
+    MODEL_NAME = "EfficientNet"  # EfficientNet, Resnet50, MobileNet, SENet50 or VGG16
     DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     CALLS = 25
     OUTPUT_FILE = f'{MODEL_NAME}_optimization_results.csv'
@@ -111,7 +112,3 @@ if __name__ == '__main__':
         writer.writerow(['Learning Rate', 'Batch Size', 'F1-Score'])
     result = gp_minimize(objective, space, n_calls=CALLS, random_state=0)
     print(f"\n\nResultados Obtidos para a otimização de hiperparâmetros do {MODEL_NAME}\nMelhor learning_rate: {result.x[0]}\nMelhor Batch Size: {result.x[1]}\n")
-
-    
-# Resnet50 Optm ->
-# EfficientNet Optm -> Melhor learning_rate: 0.0013178605614389228, Melhor Batch Size: 64

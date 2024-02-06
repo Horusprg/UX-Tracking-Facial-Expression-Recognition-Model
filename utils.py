@@ -4,8 +4,12 @@ import torch.nn as nn
 import torch.optim as optim
 from torchvision import datasets, models, transforms
 from torch.optim.lr_scheduler import ReduceLROnPlateau
+from torch.utils.data import random_split
 import copy
-import numpy
+import numpy as np
+import random
+import os
+import timm
 from sklearn.metrics import (
     precision_score,
     recall_score,
@@ -42,12 +46,16 @@ def get_transforms(img_height, img_width):
 
 
 # Carregamento dos dados
-def load_data(data_dir, img_height, img_width, batch_size):
-    train_transform, _ = get_transforms(img_height, img_width)
+def load_data(data_dir, img_height, img_width):
+    train_transform, test_transform = get_transforms(img_height, img_width)
 
     dataset = datasets.ImageFolder(data_dir)
-    dataset.transform = train_transform  # Aplica transformações de treinamento
-    return dataset
+    train_size = int(0.9 * len(dataset))
+    test_size = len(dataset) - train_size
+    train_dataset, test_dataset = random_split(dataset, [train_size, test_size])
+    train_dataset.dataset.transform = train_transform
+    test_dataset.dataset.transform = test_transform
+    return train_dataset, test_dataset
 
 # Definição do modelo
 def model_select(name, feature_extracting=False):
@@ -88,6 +96,31 @@ def model_select(name, feature_extracting=False):
             nn.Dropout(0.1),
             nn.Linear(512, 8),
         )
+    elif name == "VGG16":
+        model = models.vgg16(weights=models.VGG16_Weights.DEFAULT)
+        # Add classifier
+        num_ftrs = model.classifier[0].in_features
+        model.classifier = nn.Sequential(
+            nn.Linear(num_ftrs, 4096),
+            nn.ReLU(True),
+            nn.Dropout(),
+            nn.Linear(4096, 512),
+            nn.ReLU(True),
+            nn.Dropout(),
+            nn.Linear(512, 8),
+        )
+
+    elif name == "SENet50":
+        model = timm.create_model('legacy_senet154', pretrained=True)
+        num_ftrs = model.last_linear.in_features
+        model.fc = nn.Sequential(
+            nn.Linear(num_ftrs, 512),
+            nn.ReLU(),
+            nn.BatchNorm1d(512),
+            nn.Dropout(0.1),
+            nn.Linear(512, 8),
+        )
+
     else:
         raise Exception("Model not implemented!")
 
@@ -215,3 +248,13 @@ def model_eval(criterion, val_loss, val_loader, all_labels, all_preds, model, de
         recall,
         f1
     )
+
+def set_seed(seed_value=42):
+    random.seed(seed_value)  # Python random module.
+    np.random.seed(seed_value)  # Numpy module.
+    os.environ['PYTHONHASHSEED'] = str(seed_value)  # Python software environment.
+    torch.manual_seed(seed_value)  # PyTorch.
+    torch.cuda.manual_seed(seed_value)  # Seeds the RNG for all devices (cuda).
+    torch.cuda.manual_seed_all(seed_value)  # Para multi-GPU.
+    torch.backends.cudnn.deterministic = True  # Usa algoritmos determinísticos.
+    torch.backends.cudnn.benchmark = False
