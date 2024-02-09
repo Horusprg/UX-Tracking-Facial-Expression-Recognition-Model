@@ -6,13 +6,21 @@ from utils import model_select
 
 # Configuração do dispositivo
 
-MODEL_NAME = "EfficientNet"  # EfficientNet, DaViT, VGG16, Resnet50 or MobileNet
-MODEL_PATH = fr"results\best_{MODEL_NAME}.pth"
+MODEL_NAME1 = "VGG16"  # EfficientNet, DaViT, VGG16, Resnet50 or MobileNet
+MODEL_PATH1 = fr"results\best_{MODEL_NAME1}.pth"
+MODEL_NAME2 = "MobileNet"  # EfficientNet, DaViT, VGG16, Resnet50 or MobileNet
+MODEL_PATH2 = fr"results\best_{MODEL_NAME2}.pth"
 DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-model = model_select(MODEL_NAME)
-model.load_state_dict(torch.load(MODEL_PATH, map_location=DEVICE))
-model.to(DEVICE)
-model.eval()
+
+model1 = model_select(MODEL_NAME1)
+model1.load_state_dict(torch.load(MODEL_PATH1))
+model1.to(DEVICE)
+model1.eval()
+
+model2 = model_select(MODEL_NAME2)
+model2.load_state_dict(torch.load(MODEL_PATH2))
+model2.to(DEVICE)
+model2.eval()
 
 # Transformação para o frame da câmera
 transform = transforms.Compose([
@@ -44,7 +52,7 @@ while True:
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     faces = face_cascade.detectMultiScale(gray, 1.1, 8)
 
-    scale_factor = 0.4
+    scale_factor = 0.5
 
     for (x, y, w, h) in faces:
         # Calcular a nova área de detecção com margem extra
@@ -73,8 +81,10 @@ while True:
 
                 # Realizar a inferência no ROI
                 with torch.no_grad():
-                    outputs = model(roi_transformed)
-                    _, predicted = torch.max(outputs, 1)
+                    outputs1 = model1(roi_transformed)
+                    outputs2 = model2(roi_transformed)
+                    outputs_mean = (outputs1 + outputs2) / 2
+                    _, predicted = torch.max(outputs_mean, 1)
                     label = f"Prediction: {expres_dict[predicted.item()]}"  # Substitua pelo seu próprio mapeamento de etiquetas, se necessário
 
                 # Adicionar texto com a predição no ROI

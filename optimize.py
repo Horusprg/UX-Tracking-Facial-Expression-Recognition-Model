@@ -102,7 +102,7 @@ if __name__ == '__main__':
     DATA_DIR = 'AffectNet'
     IMG_HEIGHT, IMG_WIDTH = 96, 96
     EPOCHS = 5 # Epochs per optimization candidate
-    MODEL_NAME = "EfficientNet"  # EfficientNet, Resnet50, MobileNet, SENet50 or VGG16
+    MODEL_NAME = "DaViT"  # DaViT, EfficientNet, Resnet50, MobileNet, SENet50 or VGG16
     DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     CALLS = 25
     OUTPUT_FILE = f'{MODEL_NAME}_optimization_results.csv'

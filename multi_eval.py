@@ -34,7 +34,7 @@ def load_image(data_dir):
 
 def metrics_eval(true_labels, pred_labels):
     accuracy = (
-        100 * sum([p == l for p, l in zip(pred_labels, true_labels)]) / len(true_labels)
+        sum([p == l for p, l in zip(pred_labels, true_labels)]) / len(true_labels)
     )
     precision = precision_score(true_labels, pred_labels, average="macro")
     recall = recall_score(true_labels, pred_labels, average="macro")
@@ -54,13 +54,22 @@ if __name__ == "__main__":
     DATA_DIR = "AffectNet"
     IMG_HEIGHT, IMG_WIDTH = 96, 96
     BATCH_SIZE = 128
-    MODEL_NAME = "EfficientNet"  # EfficientNet, DaViT, VGG16, Resnet50 or MobileNet
-    MODEL_PATH = fr"results\best_{MODEL_NAME}.pth"
+
+    MODEL_NAME1 = "EfficientNet"  # EfficientNet, DaViT, VGG16, Resnet50 or MobileNet
+    MODEL_PATH1 = fr"results\best_{MODEL_NAME1}.pth"
+    MODEL_NAME2 = "MobileNet"  # EfficientNet, DaViT, VGG16, Resnet50 or MobileNet
+    MODEL_PATH2 = fr"results\best_{MODEL_NAME2}.pth"
     DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    model = model_select(MODEL_NAME)
-    model.load_state_dict(torch.load(MODEL_PATH))
-    model.to(DEVICE)
-    model.eval()
+
+    model1 = model_select(MODEL_NAME1)
+    model1.load_state_dict(torch.load(MODEL_PATH1))
+    model1.to(DEVICE)
+    model1.eval()
+    
+    model2 = model_select(MODEL_NAME2)
+    model2.load_state_dict(torch.load(MODEL_PATH2))
+    model2.to(DEVICE)
+    model2.eval()
 
     _, test_dataset = load_data(DATA_DIR, IMG_HEIGHT, IMG_WIDTH)
     true_labels = []
@@ -72,8 +81,10 @@ if __name__ == "__main__":
         for inputs, labels in test_loader:
             inputs = inputs.to(DEVICE)
             labels = labels.to(DEVICE)
-            outputs = model(inputs)
-            _, preds = torch.max(outputs, 1)
+            outputs1 = model1(inputs)
+            outputs2 = model2(inputs)
+            outputs_mean = (outputs1 + outputs2) / 2
+            _, preds = torch.max(outputs_mean, 1)
             true_labels.extend(labels.cpu().numpy())
             pred_labels.extend(preds.cpu().numpy())
     end_time = time.time()
@@ -84,10 +95,15 @@ if __name__ == "__main__":
     infer_per_second = total_inferences / total_time
 
     # Params
-    total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    params1 = sum(p.numel() for p in model1.parameters() if p.requires_grad)
+    params2 = sum(p.numel() for p in model2.parameters() if p.requires_grad)
+
+    total_params = params1 + params2
 
     # Model Size
-    file_size_bytes = os.path.getsize(MODEL_PATH)
+    file1_size = os.path.getsize(MODEL_PATH1)
+    file2_size = os.path.getsize(MODEL_PATH2)
+    file_size_bytes = file1_size + file2_size
     size_in_mb = file_size_bytes / (1024 * 1024)
 
     true_labels = [idx_to_class[label] for label in true_labels]
@@ -103,7 +119,7 @@ if __name__ == "__main__":
     class_report = classification_report(true_labels, pred_labels)
     print(f"\n---------------------------------------\n")
     print(f"Results on Test Set:\n")
-    print(f"Accuracy: {accuracy}%")
+    print(f"Accuracy: {accuracy}")
     print(f"Precision: {precision}")
     print(f"Recall: {recall}")
     print(f"F1-Score: {f1}")

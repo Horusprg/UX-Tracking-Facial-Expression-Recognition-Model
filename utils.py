@@ -3,8 +3,6 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torchvision import datasets, models, transforms
-from torch.optim.lr_scheduler import ReduceLROnPlateau
-from torch.utils.data import random_split
 import copy
 import numpy as np
 import random
@@ -48,11 +46,8 @@ def get_transforms(img_height, img_width):
 # Carregamento dos dados
 def load_data(data_dir, img_height, img_width):
     train_transform, test_transform = get_transforms(img_height, img_width)
-
-    dataset = datasets.ImageFolder(data_dir)
-    train_size = int(0.9 * len(dataset))
-    test_size = len(dataset) - train_size
-    train_dataset, test_dataset = random_split(dataset, [train_size, test_size])
+    train_dataset = torch.load(f'{data_dir}_train_dataset.pt')
+    test_dataset = torch.load(f'{data_dir}_test_dataset.pt')
     train_dataset.dataset.transform = train_transform
     test_dataset.dataset.transform = test_transform
     return train_dataset, test_dataset
@@ -107,6 +102,17 @@ def model_select(name, feature_extracting=False):
             nn.Linear(4096, 512),
             nn.ReLU(True),
             nn.Dropout(),
+            nn.Linear(512, 8),
+        )
+
+    elif name ==  "DaViT":
+        model = timm.create_model('davit_tiny.msft_in1k', pretrained=True)
+        num_ftrs = model.head.in_features
+        model.fc = nn.Sequential(
+            nn.Linear(num_ftrs, 512),
+            nn.ReLU(),
+            nn.BatchNorm1d(512),
+            nn.Dropout(0.1),
             nn.Linear(512, 8),
         )
 
